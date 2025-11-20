@@ -170,7 +170,7 @@ function main() {
 }
 
 function printStartupInfo() {
-    console.log('🚀 Code Analyzer by Hakkı Sağdıç');
+    console.log('🚀 Context Manager v3.1.0 by Hakkı Sağdıç');
     console.log('='.repeat(50));
     console.log('📋 Available options:');
     console.log('  --save-report, -s     Save detailed JSON report');
@@ -179,7 +179,10 @@ function printStartupInfo() {
     console.log('  --context-clipboard   Copy context to clipboard');
     console.log('  --method-level, -m    Enable method-level analysis');
     console.log('  --gitingest, -g       Generate GitIngest-style digest');
-    console.log('  --help, -h           Show this help message');
+    console.log('  --help, -h            Show this help message');
+    console.log();
+    console.log('💡 Tip: Use "context-manager --help" for complete documentation');
+    console.log('   including Phase 1 features (presets, token budget, rule tracing)');
 
     if (!TokenUtils.hasExactCounting()) {
         console.log('\n💡 For exact token counts, install tiktoken: npm install tiktoken');
@@ -188,12 +191,12 @@ function printStartupInfo() {
 }
 
 function printHelp() {
-    console.log('Context Manager - LLM context optimization with method-level filtering');
+    console.log('Context Manager v3.1.0 - LLM context optimization with method-level filtering');
     console.log();
     console.log('Usage: context-manager [options]');
     console.log('       node context-manager.js [options]  # Direct usage');
     console.log();
-    console.log('Options:');
+    console.log('Basic Options:');
     console.log('  -s, --save-report                    Save detailed JSON report');
     console.log('  -v, --verbose                        Show all included files');
     console.log('  --context-export                     Generate LLM context file');
@@ -203,6 +206,17 @@ function printHelp() {
     console.log('  --gitingest-from-report <file>       Generate digest from report JSON');
     console.log('  --gitingest-from-context <file>      Generate digest from context JSON');
     console.log('  -h, --help                           Show this help');
+    console.log();
+    console.log('Phase 1 Features (v3.1.0):');
+    console.log('  Note: These features are available in the full CLI (bin/cli.js)');
+    console.log('  Run "context-manager --help" for complete Phase 1 documentation');
+    console.log();
+    console.log('  --preset <name>                      Use predefined preset configuration');
+    console.log('  --list-presets                       List all available presets');
+    console.log('  --preset-info <name>                 Show detailed preset information');
+    console.log('  --target-tokens <N>                  Fit within token budget (e.g., 100k)');
+    console.log('  --fit-strategy <type>                Fitting strategy (auto, balanced, etc.)');
+    console.log('  --trace-rules                        Debug filter decisions');
     console.log();
     console.log('Method-level Configuration:');
     console.log('  .methodinclude                       Include only specified methods');
@@ -223,6 +237,9 @@ function printHelp() {
     console.log('  context-manager -s                   # Step 1: Analyze and save report');
     console.log('  context-manager --gitingest-from-report token-analysis-report.json');
     console.log('                                       # Step 2: Generate digest (instant)');
+    console.log();
+    console.log('For complete documentation including Phase 1 features:');
+    console.log('  https://github.com/hakkisagdic/context-manager');
 }
 
 // ESM entry point check

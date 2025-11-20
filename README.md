@@ -194,6 +194,408 @@ Unused Patterns: 2
   - legacy/** (never matched)
 ```
 
+---
+
+## 📖 Phase 1 Features - Detailed Guide
+
+### 🎨 Preset System
+
+The Preset System provides ready-to-use configuration profiles for common development workflows. Each preset includes optimized filter patterns, token budgets, and analysis options.
+
+#### Available Presets
+
+| Preset | Icon | Description | Token Budget | Best For |
+|--------|------|-------------|--------------|----------|
+| `default` | ⚙️ | Standard analysis with balanced settings | 150k | General development |
+| `review` | 👀 | Code review focus (filters tests/docs) | 100k | Pull requests, code reviews |
+| `llm-explain` | 💡 | Ultra-compact for LLM explanations | 50k | Quick AI queries |
+| `pair-program` | 👥 | Interactive development with full details | 200k | Pair programming sessions |
+| `security-audit` | 🔒 | Security patterns (auth, crypto, tokens) | 80k | Security reviews |
+| `documentation` | 📚 | Public APIs and documentation | 100k | API docs, guides |
+| `minimal` | 🎯 | Entry points only | 10k | Quick debugging |
+| `full` | 📦 | Complete codebase analysis | 500k+ | Comprehensive analysis |
+
+#### Usage Examples
+
+```bash
+# List all available presets
+context-manager --list-presets
+
+# View detailed information about a preset
+context-manager --preset-info review
+context-manager --preset-info security-audit
+
+# Apply a preset
+context-manager --preset review
+context-manager --preset llm-explain
+
+# Combine preset with other options
+context-manager --preset review --trace-rules
+context-manager --preset security-audit --save-report
+context-manager --preset llm-explain --context-clipboard
+
+# Override preset settings
+context-manager --preset review --target-tokens 150k
+context-manager --preset minimal --fit-strategy balanced
+```
+
+#### How Presets Work
+
+1. **Preset Selection**: User specifies `--preset <name>`
+2. **Preset Loading**: PresetManager loads configuration from `lib/presets/presets.json`
+3. **Temporary Files**: Creates temporary filter files:
+   - `.contextinclude-<preset-name>`
+   - `.contextignore-<preset-name>`
+   - `.methodinclude-<preset-name>`
+   - `.methodignore-<preset-name>`
+4. **Analysis**: Runs analysis with preset configuration
+5. **Cleanup**: Removes temporary files after completion
+
+#### Creating Custom Presets
+
+You can create custom presets by editing `lib/presets/presets.json`:
+
+```json
+{
+  "id": "my-custom",
+  "name": "My Custom Preset",
+  "description": "Custom preset for my workflow",
+  "icon": "🎨",
+  "filters": {
+    "include": ["src/**/*.js", "lib/**/*.ts"],
+    "exclude": ["**/*.test.js", "**/*.spec.js"]
+  },
+  "options": {
+    "methodLevel": true,
+    "targetTokens": 75000,
+    "fitStrategy": "balanced"
+  }
+}
+```
+
+See [lib/presets/README.md](lib/presets/README.md) for complete preset documentation.
+
+---
+
+### 🎯 Token Budget Fitter
+
+The Token Budget Fitter intelligently selects files to fit within LLM context windows. It uses importance scoring and multiple strategies to optimize file selection.
+
+#### Fitting Strategies
+
+| Strategy | Description | Best For | Reduction |
+|----------|-------------|----------|-----------|
+| `auto` | Automatically selects best strategy | General use | Varies |
+| `shrink-docs` | Removes documentation files first | Keeping code intact | 20-40% |
+| `balanced` | Optimizes token/file efficiency ratio | Balanced coverage | 30-50% |
+| `methods-only` | Extracts only methods from large files | Maximum reduction | 60-80% |
+| `top-n` | Selects most important files by priority | Focused analysis | 40-70% |
+
+#### Usage Examples
+
+```bash
+# Basic token budget fitting
+context-manager --target-tokens 100000
+context-manager --target-tokens 100k  # Shorthand notation
+
+# Specify fitting strategy
+context-manager --target-tokens 50k --fit-strategy auto
+context-manager --target-tokens 75k --fit-strategy balanced
+context-manager --target-tokens 30k --fit-strategy methods-only
+
+# Combine with presets
+context-manager --preset review --target-tokens 80k
+context-manager --preset llm-explain --target-tokens 40k --fit-strategy shrink-docs
+
+# With other options
+context-manager --target-tokens 100k --save-report --trace-rules
+context-manager --target-tokens 50k --fit-strategy balanced --context-clipboard
+```
+
+#### Importance Scoring
+
+The Token Budget Fitter uses intelligent importance scoring to prioritize files:
+
+**High Priority (Score: 80-100):**
+- Entry points: `index.js`, `main.py`, `app.js`, `server.js`
+- Core modules in `src/core/`, `lib/core/`
+- Configuration files: `config.js`, `settings.py`
+
+**Medium Priority (Score: 50-79):**
+- Source files in `src/`, `lib/`
+- Utility modules
+- API handlers and routes
+
+**Low Priority (Score: 0-49):**
+- Test files
+- Documentation
+- Build artifacts
+- Example code
+
+#### Fit Report Example
+
+```
+🎯 Token Budget Fitting
+═══════════════════════════════════════
+✅ Successfully fit 30 files within 100000 token budget
+   Strategy: balanced
+   Tokens: 98,450 / 100,000 (good fit)
+   Reduction: 701,348 tokens (87.7%)
+   Entry points preserved: 2
+
+📊 Breakdown:
+   Files included: 30
+   Files excluded: 234
+   Average importance: 72.5
+
+💡 Recommendations:
+   • Consider increasing token budget for better coverage
+   • 15 high-priority files were excluded
+   • Try "methods-only" strategy for more aggressive reduction
+```
+
+#### Advanced Options
+
+The Token Budget Fitter supports advanced configuration:
+
+```javascript
+// Programmatic usage
+const fitter = new TokenBudgetFitter(100000, 'auto');
+const result = fitter.fitToWindow(files, {
+  preserveEntryPoints: true,    // Always keep entry points
+  minFiles: 10,                 // Minimum files to include
+  maxFiles: 100,                // Maximum files to include
+  priorityPatterns: [           // Custom priority patterns
+    'src/core/**',
+    'lib/api/**'
+  ]
+});
+```
+
+See [lib/optimizers/README.md](lib/optimizers/README.md) for complete documentation.
+
+---
+
+### 🔍 Rule Debugger/Tracer
+
+The Rule Tracer helps debug filter configurations by showing exactly why files and methods are included or excluded.
+
+#### Usage Examples
+
+```bash
+# Basic rule tracing
+context-manager --trace-rules
+
+# Combine with presets
+context-manager --preset review --trace-rules
+context-manager --preset security-audit --trace-rules
+
+# Combine with token budget
+context-manager --target-tokens 100k --trace-rules
+
+# Full debugging workflow
+context-manager --preset review --target-tokens 80k --trace-rules --save-report
+```
+
+#### Trace Report Structure
+
+The trace report includes three main sections:
+
+**1. File Decisions**
+```
+📁 File Decisions:
+═══════════════════════════════════════
+✅ src/server.js
+   Reason: Matched include pattern
+   Rule: src/**/*.js
+   Source: .contextinclude
+   Priority: 10
+
+❌ test/server.test.js
+   Reason: Matched exclude pattern
+   Rule: **/*.test.js
+   Source: .contextignore
+   Priority: 20
+```
+
+**2. Pattern Analysis**
+```
+📊 Pattern Analysis:
+═══════════════════════════════════════
+Pattern: src/**/*.js
+  Source: .contextinclude
+  Matches: 120 files
+  Examples:
+    - src/server.js
+    - src/utils/helper.js
+    - src/api/routes.js
+
+Pattern: **/*.test.js
+  Source: .contextignore
+  Matches: 45 files
+  Examples:
+    - test/server.test.js
+    - src/utils/helper.test.js
+```
+
+**3. Summary Statistics**
+```
+📈 Summary:
+═══════════════════════════════════════
+Files Processed: 250
+  ✅ Included: 180 (72%)
+  ❌ Excluded: 70 (28%)
+
+Patterns Used: 12
+  Active: 10
+  Unused: 2 (legacy/**, old/**)
+
+Decision Sources:
+  .gitignore: 45 files
+  .contextignore: 15 files
+  .contextinclude: 120 files
+```
+
+#### Debugging Workflow
+
+**Step 1: Identify the Problem**
+```bash
+# Run with tracing to see what's happening
+context-manager --trace-rules
+```
+
+**Step 2: Analyze Pattern Matches**
+- Check which patterns are matching
+- Look for unused patterns
+- Verify pattern priorities
+
+**Step 3: Adjust Filters**
+```bash
+# Edit filter files based on trace output
+nano .contextinclude
+nano .contextignore
+```
+
+**Step 4: Verify Changes**
+```bash
+# Run again with tracing to confirm
+context-manager --trace-rules
+```
+
+#### Common Issues and Solutions
+
+**Issue: Important files excluded**
+```
+Problem: Core files being excluded by broad patterns
+Solution: Add specific include patterns or use negation
+
+# Add to .contextinclude
+src/core/**/*.js
+!src/core/**/*.test.js
+```
+
+**Issue: Too many files included**
+```
+Problem: Include patterns too broad
+Solution: Add exclude patterns or narrow includes
+
+# Add to .contextignore
+**/examples/**
+**/demos/**
+**/*.example.js
+```
+
+**Issue: Patterns not matching**
+```
+Problem: Pattern syntax incorrect
+Solution: Use ** for recursive, * for single level
+
+# Wrong
+src/*.js          # Only matches src/file.js
+
+# Right
+src/**/*.js       # Matches src/any/path/file.js
+```
+
+#### Method-Level Tracing
+
+When method-level analysis is enabled, the tracer also tracks method decisions:
+
+```bash
+# Enable method-level tracing
+context-manager --method-level --trace-rules
+```
+
+**Method Trace Output:**
+```
+🔧 Method Decisions:
+═══════════════════════════════════════
+File: src/server.js
+  ✅ handleRequest (line 45)
+     Reason: Matched include pattern
+     Rule: handle*
+     Source: .methodinclude
+
+  ❌ debugLog (line 120)
+     Reason: Matched exclude pattern
+     Rule: debug*
+     Source: .methodignore
+```
+
+See [lib/debug/README.md](lib/debug/README.md) for complete debugging documentation.
+
+---
+
+## 🔗 Feature Combinations
+
+The Phase 1 features work seamlessly together for powerful workflows:
+
+### Code Review Workflow
+```bash
+# Optimized code review with tracing
+context-manager --preset review --target-tokens 80k --trace-rules
+```
+- Uses review preset (filters tests/docs)
+- Fits within 80k token budget
+- Shows why files were included/excluded
+
+### Ultra-Compact LLM Context
+```bash
+# Maximum compression for LLM queries
+context-manager --preset llm-explain --target-tokens 30k --fit-strategy methods-only
+```
+- Uses llm-explain preset
+- Aggressive token reduction to 30k
+- Extracts only methods from files
+
+### Security Audit with Documentation
+```bash
+# Security review with detailed reporting
+context-manager --preset security-audit --target-tokens 100k --save-report --trace-rules
+```
+- Focuses on security-critical code
+- Fits within 100k budget
+- Saves detailed report
+- Shows filter decisions
+
+### Custom Workflow
+```bash
+# Build your own workflow
+context-manager \
+  --preset minimal \
+  --target-tokens 50k \
+  --fit-strategy balanced \
+  --trace-rules \
+  --save-report \
+  --context-clipboard
+```
+- Starts with minimal preset
+- Fits to 50k tokens
+- Uses balanced strategy
+- Traces decisions
+- Saves report
+- Copies to clipboard
+
 ### 🤖 LLM Optimization (v2.3.7)
 ```bash
 # Auto-detect LLM from environment

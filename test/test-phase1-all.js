@@ -15,7 +15,8 @@ const __dirname = dirname(__filename);
 const tests = [
     'test-phase1-presets.js',
     'test-phase1-token-budget.js',
-    'test-phase1-rule-tracer.js'
+    'test-phase1-rule-tracer.js',
+    'test-phase1-integration.js'
 ];
 
 console.log('🧪 Running Phase 1 Core Enhancements Test Suite\n');

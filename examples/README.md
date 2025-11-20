@@ -13,6 +13,10 @@ examples/
   │   ├── documentation/        # Documentation profile
   │   ├── minimal/              # Minimal profile
   │   └── full/                 # Full profile
+  ├── phase1-examples-index.md  # Phase 1 features examples index (v3.1.0)
+  ├── phase1-presets.md         # Preset System comprehensive examples (v3.1.0)
+  ├── phase1-token-budget.md    # Token Budget Fitter examples (v3.1.0)
+  ├── phase1-rule-tracer.md     # Rule Tracer debugging examples (v3.1.0)
   ├── custom-llm-profiles.example.json  # Example custom LLM profiles
   └── README.md                 # This file
 ```
@@ -254,6 +258,67 @@ When you select a profile in the wizard:
 - **Include mode** (`.contextinclude` / `.methodinclude`): Best for focused analysis
 - **Exclude mode** (`.contextignore` / `.methodignore`): Best for broad analysis with exceptions
 - **Combined mode**: Use both for fine-grained control
+
+## 🎯 Phase 1 Core Enhancements (v3.1.0)
+
+Context Manager v3.1.0 introduces three powerful features with comprehensive examples:
+
+### 🎨 Preset System
+Ready-to-use configuration profiles for common workflows.
+
+**Quick Start:**
+```bash
+# List available presets
+context-manager --list-presets
+
+# Use a preset
+context-manager --preset review
+context-manager --preset llm-explain
+context-manager --preset security-audit
+```
+
+**Documentation:**
+- [Preset System Examples](./phase1-presets.md) - Comprehensive preset usage guide
+- [Preset System README](../lib/presets/README.md) - Technical documentation
+
+### 🎯 Token Budget Fitter
+Intelligent file selection to fit within LLM context windows.
+
+**Quick Start:**
+```bash
+# Fit within token budget
+context-manager --target-tokens 100k
+
+# With specific strategy
+context-manager --target-tokens 50k --fit-strategy balanced
+context-manager --target-tokens 30k --fit-strategy methods-only
+```
+
+**Documentation:**
+- [Token Budget Examples](./phase1-token-budget.md) - Comprehensive fitting strategies guide
+- [Token Budget README](../lib/optimizers/README.md) - Technical documentation
+
+### 🔍 Rule Tracer
+Debug filter configurations and understand why files are included/excluded.
+
+**Quick Start:**
+```bash
+# Enable rule tracing
+context-manager --trace-rules
+
+# Combine with other features
+context-manager --preset review --trace-rules
+context-manager --target-tokens 100k --trace-rules
+```
+
+**Documentation:**
+- [Rule Tracer Examples](./phase1-rule-tracer.md) - Comprehensive debugging guide
+- [Rule Tracer README](../lib/debug/README.md) - Technical documentation
+
+### 📖 Complete Examples Index
+
+For a complete guide to all Phase 1 examples organized by use case, see:
+- [Phase 1 Examples Index](./phase1-examples-index.md) - Find examples by use case
 
 ## 📚 Related Documentation
 
