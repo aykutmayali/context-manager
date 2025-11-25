@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    exclude: [
+      'node_modules/**',
+      'desktop-app/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -11,6 +15,7 @@ export default defineConfig({
         'node_modules/**',
         'dist/**',
         'coverage/**',
+        'desktop-app/**',
         '**/*.config.js',
         'test/**',
       ],
