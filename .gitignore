@@ -10,6 +10,11 @@ dist/
 build/
 *.tsbuildinfo
 
+# Desktop app build artifacts (large binary files)
+desktop-app/dist-electron/
+desktop-app/dist/
+desktop-app/release/
+
 # Generated output files
 llm-context.json
 digest.txt
@@ -33,10 +38,6 @@ token-analysis-report.json
 # Testing
 coverage/
 .nyc_output/
-test/fixtures/performance-results.json
-test/fixtures/performance-integration-results.json
-test/fixtures/temp-perf/
-test/fixtures/temp-perf-integration/
 
 # Logs
 logs/
@@ -69,7 +70,3 @@ Thumbs.db
 CODE_IMPROVEMENTS.md
 ROADMAP.md
 docs/roadmap/
-
-CONTEXT-MANAGER-ROADMAP-COMPLETE.md
-future_steps.md
-FUTURE_STEPS_2.md

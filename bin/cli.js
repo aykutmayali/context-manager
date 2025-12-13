@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { TokenAnalyzer, PresetManager, TokenBudgetFitter, RuleTracer } from '../index.js';
+import { TokenAnalyzer } from '../index.js';
 import FormatRegistry from '../lib/formatters/format-registry.js';
 import FormatConverter from '../lib/utils/format-converter.js';
 import { LLMDetector } from '../lib/utils/llm-detector.js';
@@ -43,18 +43,6 @@ async function main() {
     // Check for LLM model listing (v2.3.7)
     if (args.includes('--list-llms')) {
         listLLMs();
-        return;
-    }
-
-    // Check for preset listing (v3.1.0)
-    if (args.includes('--list-presets')) {
-        listPresets();
-        return;
-    }
-
-    // Check for preset info (v3.1.0)
-    if (args.includes('--preset-info')) {
-        showPresetInfo(args);
         return;
     }
 
@@ -123,57 +111,16 @@ async function main() {
     // CLI Mode: Run traditional command-line analysis
     const options = parseArguments(args);
 
-    // Apply preset if specified (v3.1.0)
-    let appliedPreset = null;
-    if (options.preset) {
-        appliedPreset = await applyPreset(options);
-    }
-
     // Git integration: Filter to changed files only (v3.0.0)
     if (options.changedOnly || options.changedSince) {
         await runChangedFilesAnalysis(options);
-        
-        // Cleanup preset if applied
-        if (appliedPreset) {
-            cleanupPreset(appliedPreset, options.projectRoot);
-        }
         return;
     }
 
     printStartupInfo(options);
 
-    // Initialize rule tracer if enabled (v3.1.0)
-    let tracer = null;
-    if (options.traceRules) {
-        tracer = new RuleTracer();
-        tracer.enable();
-        options.ruleTracer = tracer;
-    }
-
     const analyzer = new TokenAnalyzer(options.projectRoot, options);
-    const result = analyzer.run();
-
-    // Token budget fitting is now handled inside TokenAnalyzer.run() before exports
-    // This ensures fitted files are used for all exports (context, reports, gitingest)
-
-    // Display token budget results if applied (v3.1.0)
-    if (options.targetTokens && result.files) {
-        const originalFileCount = result.totalFiles || result.files.length;
-        console.log(`\n✅ Token Budget Applied: ${result.files.length} files selected (${result.totalTokens} tokens)`);
-        if (originalFileCount > result.files.length) {
-            console.log(`   Reduced from ${originalFileCount} files to fit ${options.targetTokens} token budget`);
-        }
-    }
-
-    // Display rule trace if enabled (v3.1.0)
-    if (tracer) {
-        console.log(tracer.generateReport());
-    }
-
-    // Cleanup preset if applied
-    if (appliedPreset) {
-        cleanupPreset(appliedPreset, options.projectRoot);
-    }
+    analyzer.run();
 }
 
 function parseArguments(args) {
@@ -183,6 +130,7 @@ function parseArguments(args) {
         verbose: args.includes('--verbose') || args.includes('-v'),
         contextExport: args.includes('--context-export'),
         contextToClipboard: args.includes('--context-clipboard'),
+        json: args.includes('--json'), // NEW: JSON output mode
 
         // Analysis options
         methodLevel: args.includes('--method-level') || args.includes('-m'),
@@ -211,12 +159,6 @@ function parseArguments(args) {
             strategy: getChunkStrategy(args),
             maxTokensPerChunk: getChunkSize(args)
         },
-
-        // Phase 1 Core Enhancements (v3.1.0)
-        preset: getPreset(args),
-        targetTokens: getTargetTokens(args),
-        fitStrategy: getFitStrategy(args),
-        traceRules: args.includes('--trace-rules'),
 
         projectRoot: process.cwd()
     };
@@ -300,131 +242,22 @@ function listLLMs() {
     console.log('  context-manager --auto-detect-llm --cli\n');
 }
 
-function listPresets() {
-    console.log('\n📋 Available Presets (v3.1.0):\n');
-    console.log('═'.repeat(80));
-
-    try {
-        const manager = new PresetManager();
-        const presets = manager.listPresets();
-
-        if (presets.length === 0) {
-            console.log('No presets found.');
-            return;
-        }
-
-        presets.forEach(preset => {
-            const icon = preset.icon || '⚙️';
-            console.log(`\n${icon}  ${preset.name} (${preset.id})`);
-            console.log(`   ${preset.description}`);
-        });
-
-        console.log('\n' + '═'.repeat(80));
-        console.log('\nUsage:');
-        console.log('  context-manager --preset <PRESET_ID>');
-        console.log('  context-manager --preset-info <PRESET_ID>');
-        console.log('\nExamples:');
-        console.log('  context-manager --preset review');
-        console.log('  context-manager --preset llm-explain --target-tokens 50k');
-        console.log('  context-manager --preset-info security-audit\n');
-    } catch (error) {
-        console.error('❌ Failed to load presets:', error.message);
-    }
-}
-
-function showPresetInfo(args) {
-    const presetIndex = args.findIndex(arg => arg === '--preset-info');
-    if (presetIndex === -1 || !args[presetIndex + 1]) {
-        console.error('❌ Please specify a preset name');
-        console.error('   Usage: context-manager --preset-info <PRESET_ID>');
-        return;
-    }
-
-    const presetName = args[presetIndex + 1];
-
-    try {
-        const manager = new PresetManager();
-        const preset = manager.getPresetInfo(presetName);
-
-        if (!preset) {
-            console.error(`❌ Preset "${presetName}" not found`);
-            console.error('   Use --list-presets to see available presets');
-            return;
-        }
-
-        console.log(`\n${preset.icon || '⚙️'}  ${preset.name} (${preset.id})`);
-        console.log('═'.repeat(80));
-        console.log(`\n${preset.description}\n`);
-
-        // Filters
-        console.log('📋 Filters:');
-        if (preset.filters.include && preset.filters.include.length > 0) {
-            console.log('  Include patterns:');
-            preset.filters.include.slice(0, 5).forEach(pattern => {
-                console.log(`    - ${pattern}`);
-            });
-            if (preset.filters.include.length > 5) {
-                console.log(`    ... and ${preset.filters.include.length - 5} more`);
-            }
-        }
-        if (preset.filters.exclude && preset.filters.exclude.length > 0) {
-            console.log('  Exclude patterns:');
-            preset.filters.exclude.slice(0, 5).forEach(pattern => {
-                console.log(`    - ${pattern}`);
-            });
-            if (preset.filters.exclude.length > 5) {
-                console.log(`    ... and ${preset.filters.exclude.length - 5} more`);
-            }
-        }
-
-        // Options
-        console.log('\n⚙️  Options:');
-        Object.entries(preset.options).forEach(([key, value]) => {
-            console.log(`  ${key}: ${value}`);
-        });
-
-        // Best for
-        if (preset.metadata && preset.metadata.bestFor) {
-            console.log('\n✨ Best for:');
-            preset.metadata.bestFor.forEach(use => {
-                console.log(`  • ${use}`);
-            });
-        }
-
-        console.log('\n' + '═'.repeat(80));
-        console.log(`\nUsage: context-manager --preset ${preset.id}\n`);
-    } catch (error) {
-        console.error('❌ Failed to get preset info:', error.message);
-    }
-}
-
 function printStartupInfo(options) {
-    console.log('🚀 Context Manager v3.1.0');
+    console.log('🚀 Context Manager v3.0.0');
     console.log('='.repeat(50));
 
     // Only show active options if any are set
     const hasOptions = options.outputFormat || options.methodLevel || options.chunking?.enabled ||
-                       options.saveReport || options.verbose || options.contextExport ||
-                       options.contextToClipboard || options.gitingest || options.preset ||
-                       options.targetTokens || options.traceRules;
+        options.saveReport || options.verbose || options.contextExport ||
+        options.contextToClipboard || options.gitingest;
 
     if (hasOptions) {
         console.log('📋 Active options:');
-        if (options.preset) {
-            console.log(`  Preset: ${options.preset}`);
-        }
         if (options.outputFormat) {
             console.log(`  Output format: ${options.outputFormat}`);
         }
         if (options.methodLevel) {
             console.log('  Method-level analysis: enabled');
-        }
-        if (options.targetTokens) {
-            console.log(`  Token budget: ${options.targetTokens.toLocaleString()} tokens`);
-            console.log(`  Fit strategy: ${options.fitStrategy}`);
-        }
-        if (options.traceRules) {
-            console.log('  Rule tracing: enabled');
         }
         if (options.saveReport) {
             console.log('  Save report: enabled');
@@ -482,18 +315,6 @@ function printHelp() {
     console.log('  --auto-detect-llm        Auto-detect LLM from environment variables');
     console.log('  --list-llms              List all supported LLM models');
     console.log();
-    console.log('Preset System (v3.1.0):');
-    console.log('  --preset NAME            Use a predefined preset configuration');
-    console.log('  --list-presets           List all available presets');
-    console.log('  --preset-info NAME       Show detailed information about a preset');
-    console.log();
-    console.log('Token Budget Optimization (v3.1.0):');
-    console.log('  --target-tokens N        Fit output within token budget (e.g., 100k, 1.5M)');
-    console.log('  --fit-strategy TYPE      Strategy: auto, shrink-docs, methods-only, top-n, balanced');
-    console.log();
-    console.log('Rule Debugging (v3.1.0):');
-    console.log('  --trace-rules            Enable detailed rule tracing and show decisions');
-    console.log();
     console.log('Git Integration (v3.0.0):');
     console.log('  --changed-only           Analyze only files with uncommitted changes');
     console.log('  --changed-since REF      Analyze files changed since commit/branch');
@@ -543,13 +364,6 @@ function printHelp() {
     console.log('  context-manager --cli --chunk --chunk-strategy smart   # CLI: Smart chunking');
     console.log('  context-manager convert data.json --from json --to toon  # Convert formats');
     console.log();
-    console.log('Phase 1 Features (v3.1.0):');
-    console.log('  context-manager --preset review                  # Use code review preset');
-    console.log('  context-manager --preset llm-explain --target-tokens 50k  # Compact LLM context');
-    console.log('  context-manager --target-tokens 100k --fit-strategy auto  # Auto-fit to budget');
-    console.log('  context-manager --trace-rules                    # Debug filter rules');
-    console.log('  context-manager --preset security-audit --trace-rules     # Security audit with tracing');
-    console.log();
     console.log('Format Comparison (token efficiency):');
     console.log('  TOON:     40-50% reduction (most efficient)');
     console.log('  JSON:     Standard format (baseline)');
@@ -586,38 +400,6 @@ function getChangedSince(args) {
         return args[sinceIndex + 1];
     }
     return null;
-}
-
-function getPreset(args) {
-    const presetIndex = args.findIndex(arg => arg === '--preset');
-    if (presetIndex !== -1 && args[presetIndex + 1]) {
-        return args[presetIndex + 1];
-    }
-    return null;
-}
-
-function getTargetTokens(args) {
-    const tokensIndex = args.findIndex(arg => arg === '--target-tokens');
-    if (tokensIndex !== -1 && args[tokensIndex + 1]) {
-        const value = args[tokensIndex + 1];
-        // Support formats like "100k", "1.5M", or plain numbers
-        if (value.endsWith('k') || value.endsWith('K')) {
-            return parseInt(value.slice(0, -1), 10) * 1000;
-        }
-        if (value.endsWith('m') || value.endsWith('M')) {
-            return parseFloat(value.slice(0, -1)) * 1000000;
-        }
-        return parseInt(value, 10);
-    }
-    return null;
-}
-
-function getFitStrategy(args) {
-    const strategyIndex = args.findIndex(arg => arg === '--fit-strategy');
-    if (strategyIndex !== -1 && args[strategyIndex + 1]) {
-        return args[strategyIndex + 1];
-    }
-    return 'auto'; // Default strategy
 }
 
 async function runAPIServer(args) {
@@ -802,90 +584,6 @@ async function runDashboard() {
     }
 }
 
-async function applyPreset(options) {
-    try {
-        const manager = new PresetManager();
-        const appliedPreset = manager.applyPreset(options.preset, options.projectRoot);
-
-        console.log(`✅ Applied preset: ${appliedPreset.presetId}`);
-        console.log(`   Temporary files created: ${appliedPreset.tempFiles.length}`);
-        console.log();
-
-        // Merge preset options with CLI options (CLI takes precedence)
-        if (appliedPreset.options) {
-            if (appliedPreset.options.methodLevel && !options.methodLevel) {
-                options.methodLevel = appliedPreset.options.methodLevel;
-            }
-            if (appliedPreset.options.gitingest && !options.gitingest) {
-                options.gitingest = appliedPreset.options.gitingest;
-            }
-            if (appliedPreset.options.targetTokens && !options.targetTokens) {
-                options.targetTokens = appliedPreset.options.targetTokens;
-            }
-            if (appliedPreset.options.fitStrategy && options.fitStrategy === 'auto') {
-                options.fitStrategy = appliedPreset.options.fitStrategy;
-            }
-        }
-
-        return appliedPreset;
-    } catch (error) {
-        console.error(`❌ Failed to apply preset: ${error.message}`);
-        console.error('   Continuing with default configuration...\n');
-        return null;
-    }
-}
-
-function cleanupPreset(appliedPreset, projectRoot) {
-    if (!appliedPreset) return;
-
-    try {
-        // Ensure projectRoot is available in appliedPreset for cleanup
-        if (projectRoot && !appliedPreset.projectRoot) {
-            appliedPreset.projectRoot = projectRoot;
-        }
-
-        const manager = new PresetManager();
-        manager.cleanup(appliedPreset);
-        console.log(`\n✅ Cleaned up preset files`);
-    } catch (error) {
-        console.warn(`⚠️  Failed to cleanup preset files: ${error.message}`);
-    }
-}
-
-async function applyTokenBudgetFitting(result, options) {
-    try {
-        console.log('\n🎯 Token Budget Fitting');
-        console.log('═'.repeat(60));
-
-        const fitter = new TokenBudgetFitter(options.targetTokens, options.fitStrategy);
-        const fitResult = fitter.fitToWindow(result.files || [], {
-            preserveEntryPoints: true
-        });
-
-        const report = fitter.generateReport(fitResult);
-
-        console.log('\n' + report.summary);
-
-        if (report.recommendations && report.recommendations.length > 0) {
-            console.log('\n💡 Recommendations:');
-            report.recommendations.forEach(rec => {
-                console.log(`   • ${rec}`);
-            });
-        }
-
-        console.log('\n' + '═'.repeat(60));
-
-        // Update result with fitted files
-        if (result.files) {
-            result.files = fitResult.files;
-            result.totalTokens = fitResult.totalTokens;
-        }
-    } catch (error) {
-        console.error(`❌ Token budget fitting failed: ${error.message}`);
-        console.error('   Continuing with original file list...\n');
-    }
-}
-
 function runFormatConversion(args) {
     // v2.3.2: Format conversion utility
     const converter = new FormatConverter();
@@ -935,5 +633,9 @@ function runFormatConversion(args) {
 // ESM entry point
 main().catch(error => {
     console.error('❌ Error:', error.message);
+    // Exit codes:
+    // 0: Success
+    // 1: General error
+    // 2: Validation/argument error
     process.exit(1);
 });

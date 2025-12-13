@@ -4,8 +4,8 @@
  * Generate GitIngest digest from GitHub repositories
  */
 
-import GitUtils from '../lib/utils/git-utils.js';
-import { getLogger } from '../lib/utils/logger.js';
+const GitUtils = require('../lib/utils/git-utils');
+const { getLogger } = require('../lib/utils/logger');
 
 const logger = getLogger({ level: 'info' });
 
